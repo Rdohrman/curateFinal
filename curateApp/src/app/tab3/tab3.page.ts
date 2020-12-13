@@ -17,6 +17,7 @@ export class Tab3Page {
   canvasElement: any;
   canvasContext: any;
   loading: HTMLIonLoadingElement;
+  fileinput: any;
 
   constructor(private toastCtrl: ToastController,
     private loadingCtrl: LoadingController,
@@ -34,32 +35,33 @@ export class Tab3Page {
   };
 
   async startScan() {
+    // Not working on iOS standalone mode!
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment' }
     });
+   
     this.videoElement.srcObject = stream;
+    // Required for Safari
     this.videoElement.setAttribute('playsinline', true);
-    this.videoElement.play();
-
+   
     this.loading = await this.loadingCtrl.create({});
     await this.loading.present();
-
+   
+    this.videoElement.play();
     requestAnimationFrame(this.scan.bind(this));
   }
-
+   
   async scan() {
-    console.log('SCAN');
-
     if (this.videoElement.readyState === this.videoElement.HAVE_ENOUGH_DATA) {
       if (this.loading) {
         await this.loading.dismiss();
         this.loading = null;
         this.scanActive = true;
-      };
-
+      }
+   
       this.canvasElement.height = this.videoElement.videoHeight;
       this.canvasElement.width = this.videoElement.videoWidth;
-
+   
       this.canvasContext.drawImage(
         this.videoElement,
         0,
@@ -67,30 +69,27 @@ export class Tab3Page {
         this.canvasElement.width,
         this.canvasElement.height
       );
-
       const imageData = this.canvasContext.getImageData(
         0,
         0,
         this.canvasElement.width,
-        this.canvasElement.height,
+        this.canvasElement.height
       );
-
       const code = jsQR(imageData.data, imageData.width, imageData.height, {
         inversionAttempts: 'dontInvert'
       });
-      console.log('code: ', code);
+   
       if (code) {
         this.scanActive = false;
         this.scanResult = code.data;
         this.showQrToast();
-      }
-      else {
-        requestAnimationFrame(this.scan.bind(this))
+      } else {
+        if (this.scanActive) {
+          requestAnimationFrame(this.scan.bind(this));
+        }
       }
     } else {
-      if (this.scanActive) {
-        requestAnimationFrame(this.scan.bind(this))
-      }
+      requestAnimationFrame(this.scan.bind(this));
     }
   }
 
@@ -116,4 +115,32 @@ export class Tab3Page {
       ]
     });
   };
+  captureImage() {
+    this.fileinput.nativeElement.click();
+  }
+   
+  handleFile(files: FileList) {
+    const file = files.item(0);
+   
+    var img = new Image();
+    img.onload = () => {
+      this.canvasContext.drawImage(img, 0, 0, this.canvasElement.width, this.canvasElement.height);
+      const imageData = this.canvasContext.getImageData(
+        0,
+        0,
+        this.canvasElement.width,
+        this.canvasElement.height
+      );
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert'
+      });
+   
+      if (code) {
+        this.scanResult = code.data;
+        this.showQrToast();
+      }
+    };
+    img.src = URL.createObjectURL(file);
+  }
+
 };
